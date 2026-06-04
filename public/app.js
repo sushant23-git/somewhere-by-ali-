@@ -116,17 +116,53 @@ const msgInput = document.getElementById('msg-input');
 const charLeft = document.getElementById('char-left');
 msgInput.addEventListener('input', () => { charLeft.textContent = 500 - msgInput.value.length; });
 
-// ── Messages (localStorage) ──
-function saveMessage(text, theme) {
-  const msgs = JSON.parse(localStorage.getItem('somewhere_msgs') || '[]');
-  msgs.push({ text, theme, id: Date.now() });
-  if (msgs.length > 200) msgs.shift();
-  localStorage.setItem('somewhere_msgs', JSON.stringify(msgs));
+// ── Messages (API Endpoints) ──
+async function saveMessage(text, theme) {
+  try {
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, theme })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      console.error('Failed to save message:', data.error);
+    }
+    updateStatsDisplay();
+  } catch (err) {
+    console.error('Error saving message:', err);
+  }
 }
-function getRandomMessage() {
-  const msgs = JSON.parse(localStorage.getItem('somewhere_msgs') || '[]');
-  if (!msgs.length) return null;
-  return msgs[Math.floor(Math.random() * msgs.length)];
+
+async function fetchRandomMessage(theme) {
+  try {
+    const res = await fetch(`/api/messages/random?theme=${theme}`);
+    const data = await res.json();
+    if (data.success && data.message) {
+      rcMessage = data.message;
+    } else {
+      rcMessage = null;
+    }
+  } catch (err) {
+    console.error('Error fetching random message:', err);
+    rcMessage = null;
+  }
+}
+
+async function updateStatsDisplay() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    if (data.success && data.stats) {
+      const statsText = document.getElementById('stats-text');
+      if (statsText) {
+        statsText.textContent = `${data.stats.total} thoughts floating in the atmosphere`;
+        statsText.style.opacity = '0.6';
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching stats:', err);
+  }
 }
 
 // ── SEND ANIMATION ──
@@ -611,7 +647,8 @@ document.getElementById('btn-release').addEventListener('click', () => {
 });
 
 document.getElementById('btn-receive').addEventListener('click', () => {
-  rcMessage = getRandomMessage();
+  rcMessage = null;
+  fetchRandomMessage(currentTheme);
   rcReady = false;
   document.getElementById('tap-open').style.display = 'none';
   goTo('receiving');
@@ -635,3 +672,4 @@ document.getElementById('btn-letgo').addEventListener('click', () => {
 // ── Init ──
 initParticles('sky');
 atmoLoop();
+updateStatsDisplay();
